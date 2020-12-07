@@ -4,13 +4,13 @@ const cors = require("cors");
 const url = require("url");
 
 const { verifyToken, apiLimiter } = require("./middlewares"); // 토큰 디코딩
-const { Domain, User, Post, Hashtag } = require("../models");
+const { Domain, User, Post, Hashtag, Follow } = require("../models");
 
 const router = express.Router();
 
 router.use(async (req, res, next) => {
   // host를 체크하여 cors 처리하는 미들웨어
-  console.log(url.parse(req.get("origin")).host);
+  // console.log(url.parse(req.get("origin")).host);
   const domain = await Domain.findOne({
     where: { host: url.parse(req.get("origin")).host }, // url.parse.host: 프로토콜 제거한 호스트만 parsing
   });
@@ -117,5 +117,69 @@ router.get(
     }
   }
 );
+
+// 내가 팔로우하는 유저 보기
+router.get("/following/my", apiLimiter, verifyToken, async (req, res) => {
+  try {
+    // const followings = await User.findOne({
+    //   where: { id: req.decoded.id },
+    //   attributes: [],
+    //   include: [{
+    //     model: User,
+    //     attributes: ['id', 'nick'],
+    //     as: 'Followings'
+    //   }]
+    // });
+    // 아래 코드와 결과 동일함
+    const user = await User.findOne({
+      where: { id: req.decoded.id },
+    });
+    const followings = await user.getFollowings({ attributes: ["id", "nick"] });
+    res.json({
+      code: 200,
+      payload: followings.map(f => ({id: f.id, nick: f.nick})),
+    });
+  } catch (error) {
+    console.error(error);
+    return res.status(500).json({
+      code: 500,
+      message: "서버 에러",
+    });
+  }
+});
+
+// 나를 팔로우하는 유저 보기
+router.get("/follower/my", apiLimiter, verifyToken, async (req, res) => {
+  try {
+    // const followings = await User.findOne({
+    //   where: { id: req.decoded.id },
+    //   attributes: [],
+    //   include: [{
+    //     model: User,
+    //     attributes: ['id', 'nick'],
+    //     as: 'Followings'
+    //   }]
+    // });
+    // 아래 코드와 결과 동일함
+    const user = await User.findOne({
+      where: { id: req.decoded.id },
+    });
+    const followers = await user.getFollowers({ attributes: ["id", "nick"] });
+    res.json({
+      code: 200,
+      payload: followers.map(f => ({id: f.id, nick: f.nick})),
+    });
+    res.json({
+      code: 200,
+      payload: user,
+    });
+  } catch (error) {
+    console.error(error);
+    return res.status(500).json({
+      code: 500,
+      message: "서버 에러",
+    });
+  }
+});
 
 module.exports = router;
