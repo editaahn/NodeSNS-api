@@ -3,8 +3,10 @@ const jwt = require("jsonwebtoken");
 const cors = require("cors");
 const url = require("url");
 
-const { verifyToken, apiLimiter } = require("./middlewares"); // 토큰 디코딩
-const { Domain, User, Post, Hashtag, Follow } = require("../models");
+const { verifyToken } = require("./middlewares"); // 토큰 디코딩
+const { findType } = require("./findType");
+const { apiLimiter } = require("./apiLimiter");
+const { Domain, User, Post, Hashtag } = require("../models");
 
 const router = express.Router();
 
@@ -21,7 +23,7 @@ router.use(async (req, res, next) => {
   }
 });
 
-router.post("/token", apiLimiter, async (req, res) => {
+router.post("/token", async (req, res) => {
   const { clientSecret } = req.body; // body에 담긴 clientSecret
   try {
     const domain = await Domain.findOne({
@@ -64,14 +66,13 @@ router.post("/token", apiLimiter, async (req, res) => {
 });
 
 // 발급한 토큰 테스트
-router.get("/test", apiLimiter, verifyToken, (req, res) => {
+router.get("/test", verifyToken, findType, apiLimiter, (req, res) => {
   res.json(req.decoded);
 });
 
-router.get("/posts/my", apiLimiter, verifyToken, (req, res) => {
+router.get("/posts/my", verifyToken, findType, apiLimiter, (req, res) => {
   Post.findAll({ where: { userId: req.decoded.id } }) // 디코드된 id값과 일치하는 user의 posts를 전부 가져옴
     .then((posts) => {
-      console.log(posts);
       res.json({
         code: 200,
         payload: posts, //payload에 posts를 담아서 반환
@@ -89,6 +90,7 @@ router.get("/posts/my", apiLimiter, verifyToken, (req, res) => {
 router.get(
   "/posts/hashtag/:title",
   verifyToken,
+  findType,
   apiLimiter,
   async (req, res) => {
     try {
@@ -119,67 +121,77 @@ router.get(
 );
 
 // 내가 팔로우하는 유저 보기
-router.get("/following/my", apiLimiter, verifyToken, async (req, res) => {
-  try {
-    // const followings = await User.findOne({
-    //   where: { id: req.decoded.id },
-    //   attributes: [],
-    //   include: [{
-    //     model: User,
-    //     attributes: ['id', 'nick'],
-    //     as: 'Followings'
-    //   }]
-    // });
-    // 아래 코드와 결과 동일함
-    const user = await User.findOne({
-      where: { id: req.decoded.id },
-    });
-    const followings = await user.getFollowings({ attributes: ["id", "nick"] });
-    res.json({
-      code: 200,
-      payload: followings.map(f => ({id: f.id, nick: f.nick})),
-    });
-  } catch (error) {
-    console.error(error);
-    return res.status(500).json({
-      code: 500,
-      message: "서버 에러",
-    });
+router.get(
+  "/following/my",
+  verifyToken,
+  findType,
+  apiLimiter,
+  async (req, res) => {
+    try {
+      // const followings = await User.findOne({
+      //   where: { id: req.decoded.id },
+      //   attributes: [],
+      //   include: [{
+      //     model: User,
+      //     attributes: ['id', 'nick'],
+      //     as: 'Followings'
+      //   }]
+      // });
+      // 아래 코드와 결과 동일함
+      const user = await User.findOne({
+        where: { id: req.decoded.id },
+      });
+      const followings = await user.getFollowings({
+        attributes: ["id", "nick"],
+      });
+      res.json({
+        code: 200,
+        payload: followings.map((f) => ({ id: f.id, nick: f.nick })),
+      });
+    } catch (error) {
+      console.error(error);
+      return res.status(500).json({
+        code: 500,
+        message: "서버 에러",
+      });
+    }
   }
-});
+);
 
 // 나를 팔로우하는 유저 보기
-router.get("/follower/my", apiLimiter, verifyToken, async (req, res) => {
-  try {
-    // const followings = await User.findOne({
-    //   where: { id: req.decoded.id },
-    //   attributes: [],
-    //   include: [{
-    //     model: User,
-    //     attributes: ['id', 'nick'],
-    //     as: 'Followings'
-    //   }]
-    // });
-    // 아래 코드와 결과 동일함
-    const user = await User.findOne({
-      where: { id: req.decoded.id },
-    });
-    const followers = await user.getFollowers({ attributes: ["id", "nick"] });
-    res.json({
-      code: 200,
-      payload: followers.map(f => ({id: f.id, nick: f.nick})),
-    });
-    res.json({
-      code: 200,
-      payload: user,
-    });
-  } catch (error) {
-    console.error(error);
-    return res.status(500).json({
-      code: 500,
-      message: "서버 에러",
-    });
+router.get(
+  "/follower/my",
+  verifyToken,
+  findType,
+  apiLimiter,
+  async (req, res) => {
+    try {
+      // const followings = await User.findOne({
+      //   where: { id: req.decoded.id },
+      //   attributes: [],
+      //   include: [{
+      //     model: User,
+      //     attributes: ['id', 'nick'],
+      //     as: 'Followings'
+      //   }]
+      // });
+      // 아래 코드와 결과 동일함
+      const user = await User.findOne({
+        where: { id: req.decoded.id },
+      });
+      const followers = await user.getFollowers({ attributes: ["id", "nick"] });
+      res.json({
+        code: 200,
+        payload: followers.map((f) => ({ id: f.id, nick: f.nick })),
+      });
+    } catch (error) {
+      console.error(error);
+      return res.status(500).json({
+        code: 500,
+        message: "서버 에러",
+      });
+    }
   }
-});
+);
 
 module.exports = router;
